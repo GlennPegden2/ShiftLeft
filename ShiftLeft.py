@@ -10,6 +10,8 @@ import subprocess
 import time
 import random
 import string
+from zapv2 import ZAPv2
+import config as cfg
 
 
 def downloadWPPlugin (pluginName):
@@ -17,7 +19,6 @@ def downloadWPPlugin (pluginName):
     if not re.match("^[a-z_-]*$", pluginName):
         print("Error! invalid chars in plugin name")
         sys.exit()
-
 
     pluginpage = "https://wordpress.org/plugins/" + pluginName + "/"
     response = urllib.request.urlopen(pluginpage)
@@ -58,9 +59,14 @@ def scan_dynamic_burp():
     subprocess.getoutput('java -jar -Xmx1024m -Djava.awt.headless=true  /Applications/Burp\ Suite\ Professional.app/Contents/java/app/burp/burpsuite_pro_1.7.33-18.jar http 127.0.0.1 8088 /')
     os.chdir(cdir)
 
+def scan_dynamic_zap():
+    print("Running dynamic analysis using OWASP Zap (this can take a while!)")
+    print("ZAP API Key is ...."+cfg.ZAP_API)    
+
 def standupWordPress():
     print("Running WordPress Docker container")
-    subprocess.getoutput("docker-compose -f ~/ShiftLeft/wpdocker/docker-compose.yaml up -d")
+    out=subprocess.getoutput("docker-compose -f ~/ShiftLeft/wpdocker/docker-compose.yaml up -d")
+#    print(out)
 
 def configureWP(pluginName):
     print("Configuring WordPress - Initial Setup")
@@ -82,7 +88,7 @@ pluginName = "wordpress-seo"
 closedownWordPress()
 
 downloadWPPlugin(pluginName)
-scan_static_PHPCS()
+#scan_static_PHPCS()
 standupWordPress()
 
 for number in range(12):
@@ -96,7 +102,8 @@ for number in range(12):
         time.sleep(10)
 
 #We should probably check here if it did ever start
-scan_dynamic_burp()
+#scan_dynamic_burp()
+scan_dynamic_zap()
 
 #closedownWordPress()
 
