@@ -10,6 +10,8 @@ import subprocess
 import time
 import random
 import string
+import shutil
+from pprint import pprint
 from zapv2 import ZAPv2
 import config as cfg
 
@@ -61,11 +63,42 @@ def scan_dynamic_burp():
 
 def scan_dynamic_zap():
     print("Running dynamic analysis using OWASP Zap (this can take a while!)")
-    print("ZAP API Key is ...."+cfg.ZAP_API)    
+    zap = ZAPv2(apikey=cfg.ZAP_API)
+    target="http://127.0.0.1:8088"
+
+    print('Accessing target {}'.format(target))
+    zap.urlopen(target)
+    time.sleep(2)
+
+    print('Spidering target {}'.format(target))
+    scanid = zap.spider.scan(target)
+    time.sleep(2)
+    while (int(zap.spider.status(scanid)) < 100):
+        print('Zap Spider progress %: {}'.format(zap.spider.status(scanid)))
+        time.sleep(2)
+
+    print ('Spider completed')
+
+    while (int(zap.pscan.records_to_scan) > 0):
+        print ('Zap Records to passive scan : {}'.format(zap.pscan.records_to_scan))
+        time.sleep(2)
+
+    print ('Passive Scan completed')
+
+    print ('Active Scanning target {}'.format(target))
+    scanid = zap.ascan.scan(target)
+    while (int(zap.ascan.status(scanid)) < 100):
+        print ('Zap Scan progress %: {}'.format(zap.ascan.status(scanid)))
+        time.sleep(5)
+
+    print ('Active Scan completed')
+    zaplog=open("/tmp/shiftleft/results/Zap.log","w")
+    pprint(zap.core.alerts(),zaplog)
+    zaplog.close()
 
 def standupWordPress():
     print("Running WordPress Docker container")
-    out=subprocess.getoutput("docker-compose -f ~/ShiftLeft/wpdocker/docker-compose.yaml up -d")
+    subprocess.getoutput("docker-compose -f ~/ShiftLeft/wpdocker/docker-compose.yaml up -d")
 #    print(out)
 
 def configureWP(pluginName):
@@ -82,19 +115,26 @@ def closedownWordPress():
     print("Shutting down WordPress docker container")
     subprocess.getoutput("docker-compose -f ~/ShiftLeft/wpdocker/docker-compose.yaml down --volumes")    
 
-pluginName = "wordpress-seo"
+def zipLogs(pluginName):
+    print("Zipping up logs")
+    shutil.make_archive(pluginName+".zip", "zip", "/tmp/shiftleft/results")
+
+if (len(sys.argv) > 1):
+    pluginName = sys.argv[1]
+else:
+    pluginName = "wordpress-seo"
 
 #Cleanup during testing, normally the closedown would run after all the tests had finished
 closedownWordPress()
 
 downloadWPPlugin(pluginName)
-#scan_static_PHPCS()
+scan_static_PHPCS()
 standupWordPress()
 
 for number in range(12):
     s = subprocess.getoutput("docker ps")
     if s.find("wpdocker_my-wp_1") != -1:
-        time.sleep(10) #Give the actual host time to boot
+        time.sleep(10) #Give the actual host time to startup
         configureWP(pluginName)
         break
     else:
@@ -102,9 +142,11 @@ for number in range(12):
         time.sleep(10)
 
 #We should probably check here if it did ever start
-#scan_dynamic_burp()
+scan_dynamic_burp()
 scan_dynamic_zap()
 
-#closedownWordPress()
+zipLogs(pluginName)
+
+closedownWordPress()
 
 

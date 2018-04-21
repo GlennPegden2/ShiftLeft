@@ -1,0 +1,28 @@
+version: "2"
+services:
+  my-wpdb:
+    image: mariadb
+    ports:
+      - "8081:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: PutAPasswordHere
+  my-wp:
+    image: wordpress
+    volumes:
+      - ./:/var/www/html
+    ports:
+      - "8088:80"
+    links:
+      - my-wpdb:mysql
+    environment:
+      WORDPRESS_DB_PASSWORD: PutANotherPasswordHere
+
+  my-wpcli:
+    image: tatemz/wp-cli
+    volumes_from:
+      - my-wp
+    links:
+      - my-wpdb:mysql
+    entrypoint: wp  
+    command: "--info"
+
